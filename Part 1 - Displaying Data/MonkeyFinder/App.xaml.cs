@@ -1,11 +1,11 @@
 ﻿namespace MonkeyFinder;
-
-public partial class App : Application
+public partial class AppShell : Shell
 {
-	public App()
-	{
-		InitializeComponent();
+    public AppShell()
+    {
+        InitializeComponent();
+    
 
-		MainPage = new AppShell();
-	}
+    Routing.RegisterRoute(nameof(DetailsPage), typeof(DetailsPage));
+    }
 }
