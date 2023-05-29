@@ -14,7 +14,7 @@
 
             <Style TargetType="Page" ApplyToDerivedTypes="True">
                 <Setter Property="BackgroundColor"
-                        Value="{StaticResource LightBackground}" />
+                        Value="{StaticResource DarkBackground}" />
             </Style>
 
 			<Style ApplyToDerivedTypes="True" TargetType="NavigationPage">
