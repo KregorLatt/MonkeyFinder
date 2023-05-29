@@ -1,13 +1,13 @@
-﻿
-using MonkeyFinder.Services;
-
+﻿using MonkeyFinder.Services;
 
 namespace MonkeyFinder.ViewModel;
+
 public partial class MonkeysViewModel : BaseViewModel
 {
-    public ObservableCollection<Monkey> Monkeys { get; } = new();
     MonkeyService monkeyService;
-   
+    public ObservableCollection<Monkey> Monkeys { get; } = new();
+
+    //Internet control
     IConnectivity connectivity;
     IGeolocation geolocation;
     public MonkeysViewModel(MonkeyService monkeyService, IConnectivity connectivity, IGeolocation geolocation)
@@ -18,19 +18,57 @@ public partial class MonkeysViewModel : BaseViewModel
         this.geolocation = geolocation;
     }
 
-    [RelayCommand]
-    async Task GoToDetails(Monkey monkey)
-    {
-        if (monkey == null)
-            return;
-        await Shell.Current.GoToAsync(nameof(DetailsPage), true, new Dictionary<string, object>
-        {
-            {"Monkey", monkey }
-        });
-    }
-
     [ObservableProperty]
     bool isRefreshing;
+
+    [RelayCommand]
+    async Task GetClossestMonkey()
+    {
+        if (IsBusy || Monkeys.Count == 0)
+            return;
+
+        try
+        {
+            var location = await geolocation.GetLastKnownLocationAsync();
+            if (location is null)
+            {
+                location = await geolocation.GetLocationAsync(
+                    new GeolocationRequest
+                    {
+                        DesiredAccuracy = GeolocationAccuracy.Medium,
+                        Timeout = TimeSpan.FromSeconds(30),
+                    });
+            }
+
+            if (location is null)
+                return;
+
+            var first = Monkeys.OrderBy(m => location.CalculateDistance(m.Latitude, m.Longitude, DistanceUnits.Miles)).FirstOrDefault();
+
+            if (first is null)
+                return;
+
+            await Shell.Current.DisplayAlert("Closest Monkey", $"{first.Name} in {first.Location}", "OK");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Unable to get monkeys: {ex.Message}");
+            await Shell.Current.DisplayAlert("Error!", ex.Message, "OK");
+        }
+    }
+
+    [RelayCommand]
+    async Task GoToDetailsAsync(Monkey monkey)
+    {
+        if (monkey is null)
+            return;
+
+        await Shell.Current.GoToAsync($"{nameof(DetailsPage)}", true,
+            new Dictionary<string, object>
+            {
+                {"Monkey", monkey }
+            });
+    }
 
     [RelayCommand]
     async Task GetMonkeysAsync()
@@ -42,8 +80,7 @@ public partial class MonkeysViewModel : BaseViewModel
         {
             if (connectivity.NetworkAccess != NetworkAccess.Internet)
             {
-                await Shell.Current.DisplayAlert("No connectivity!",
-                    $"Please check internet and try again.", "OK");
+                await Shell.Current.DisplayAlert("Internet issue!", "Check your internet try again!", "OK");
                 return;
             }
 
@@ -52,9 +89,11 @@ public partial class MonkeysViewModel : BaseViewModel
 
             if (Monkeys.Count != 0)
                 Monkeys.Clear();
+
             foreach (var monkey in monkeys)
                 Monkeys.Add(monkey);
-        
+
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"Unable to get monkeys: {ex.Message}");
@@ -67,40 +106,4 @@ public partial class MonkeysViewModel : BaseViewModel
         }
 
     }
-}
-
-[RelayCommand]
-async Task GetClosestMonkey()
-{
-    if (IsBusy || Monkeys.Count == 0)
-        return;
-
-    try
-    {
-        // Get cached location, else get real location.
-        var location = await geolocation.GetLastKnownLocationAsync();
-        if (location == null)
-        {
-            location = await geolocation.GetLocationAsync(new GeolocationRequest
-            {
-                DesiredAccuracy = GeolocationAccuracy.Medium,
-                Timeout = TimeSpan.FromSeconds(30)
-            });
-        }
-
-        // Find closest monkey to us
-        var first = Monkeys.OrderBy(m => location.CalculateDistance(
-            new Location(m.Latitude, m.Longitude), DistanceUnits.Miles))
-            .FirstOrDefault();
-
-        await Shell.Current.DisplayAlert("", first.Name + " " +
-            first.Location, "OK");
-
-    }
-    catch (Exception ex)
-    {
-        Debug.WriteLine($"Unable to query location: {ex.Message}");
-        await Shell.Current.DisplayAlert("Error!", ex.Message, "OK");
-    }
-}
 }
